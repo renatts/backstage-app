@@ -34,6 +34,9 @@ When editing existing code:
 - Don't "improve" adjacent code, comments, or formatting.
 - Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
+- Before editing any file, read it first. 
+- Before modifying a function, grep for all callers. 
+- Research before you edit. 
 - If you notice unrelated dead code, mention it - don't delete it.
 
 When your changes create orphans:
@@ -41,6 +44,15 @@ When your changes create orphans:
 - Don't remove pre-existing dead code unless asked.
 
 The test: Every changed line should trace directly to the user's request.
+
+## Reading & Research Efficiency
+
+**Read once, remember. Target your reads.**
+
+- Maintain a 4:1+ read-to-edit ratio. Never edit a file you haven't read first.
+- Don't re-read files already loaded in context. If you've read `ci.yaml`, `package.json`, or `Dockerfile` this session, use what you have.
+- When directed to a specific location, read only that range — don't load the entire file.
+- Batch related reads into a single call instead of reading files one by one.
 
 ## 4. Goal-Driven Execution
 
