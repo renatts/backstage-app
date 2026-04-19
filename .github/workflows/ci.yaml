@@ -114,6 +114,9 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true   # skip CVEs with no fix available
           trivyignores: .trivyignore
+          # Without this, sarif output includes every severity and exit-code
+          # triggers on any finding — we only want HIGH/CRITICAL to fail CI.
+          limit-severities-for-sarif: true
 
       # Always upload results so they appear in the Security → Code Scanning tab.
       - name: Upload Trivy SARIF to GitHub Security
