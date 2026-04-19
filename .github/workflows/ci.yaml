@@ -132,7 +132,7 @@ jobs:
 
       # Tags applied:
       #   sha-<short-sha>  — every push
-      #   latest           — push to master/main only
+      #   latest           — push to main only
       #   v1.2.3 / 1.2     — on semver git tags
       - name: Extract Docker metadata
         id: meta
@@ -141,7 +141,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
           labels: |
