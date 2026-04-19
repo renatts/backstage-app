@@ -1,0 +1,22 @@
+# Trivy vulnerability ignores.
+#
+# Each entry must include: (1) the CVE, (2) the affected path or package,
+# (3) why we accept it, (4) when to revisit.
+#
+# Re-audit this file whenever backend deps are bumped (especially
+# @backstage/backend-defaults) or the node base image is rebased.
+
+# picomatch 4.0.3 — shipped with node:24-trixie-slim's bundled npm inside
+# /usr/local/lib/node_modules/npm/node_modules/tinyglobby. Backstage backend
+# runs `node packages/backend` and does not invoke npm at runtime, so the
+# vulnerable glob parser is unreachable.
+# Revisit when node:24-trixie-slim ships npm with tinyglobby ≥ current fixed.
+CVE-2026-33671
+
+# undici 5.29.0 — transitively required by urllib@3 → infinispan@0.12 →
+# @backstage/backend-defaults. urllib@3 pins `undici: ^5.28.2`; forcing 7.x via
+# resolution breaks urllib's internal API usage. Revisit when
+# @backstage/backend-defaults drops infinispan or urllib publishes a 3.x line
+# on undici 6+.
+CVE-2026-1526
+CVE-2026-2229
