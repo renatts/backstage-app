@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 1 — Build & Audit
