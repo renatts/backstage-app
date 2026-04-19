@@ -113,6 +113,7 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true   # skip CVEs with no fix available
+          trivyignores: .trivyignore
 
       # Always upload results so they appear in the Security → Code Scanning tab.
       - name: Upload Trivy SARIF to GitHub Security
