@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/backstage-app
+  NODE_VERSION: "22"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 1 — Build & Audit
+# Installs deps, runs security audit, type-checks, lints, and builds the app.
+# Uploads the backend dist artifacts for downstream jobs.
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  build-and-audit:
+    name: Build & Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      # Fails the build on HIGH or CRITICAL vulnerabilities.
+      # Use --all to include devDependencies or remove it to audit only prod deps.
+      - name: Audit dependencies
+        run: yarn npm audit --severity high --recursive
+        continue-on-error: false
+
+      - name: Type check
+        run: yarn tsc
+
+      - name: Lint
+        run: yarn lint:all
+
+      - name: Build backend
+        run: yarn build:backend
+
+      # Upload dist so the next job can build the Docker image without re-running yarn
+      - name: Upload backend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: packages/backend/dist/
+          retention-days: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 2 — Scan & Push
+# Builds the Docker image, scans it with Trivy, then pushes to DockerHub.
+# Pushing only happens on non-PR events (push to master/main or version tag).
+# ─────────────────────────────────────────────────────────────────────────────
+  scan-and-push:
+    name: Scan & Push
+    runs-on: ubuntu-latest
+    needs: build-and-audit
+
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to GitHub Security tab
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download backend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-dist
+          path: packages/backend/dist/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build into local Docker daemon so Trivy can scan it.
+      # Cache layers in GitHub Actions cache to speed up subsequent builds.
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          load: true
+          tags: backstage-app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Scan the image — exit-code 1 blocks the push if HIGH/CRITICAL CVEs found.
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          image-ref: backstage-app:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true   # skip CVEs with no fix available
+
+      # Always upload results so they appear in the Security → Code Scanning tab.
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      # ── Push (skipped for pull requests) ────────────────────────────────────
+
+      - name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Tags applied:
+      #   sha-<short-sha>  — every push
+      #   latest           — push to master/main only
+      #   v1.2.3 / 1.2     — on semver git tags
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=Backstage App
+            org.opencontainers.image.description=Internal Developer Portal
+
+      - name: Build and push to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true   # SLSA provenance attestation
+          sbom: true         # generate Software Bill of Materials
