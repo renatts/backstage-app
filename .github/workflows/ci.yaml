@@ -12,7 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/backstage-app
   NODE_VERSION: "22"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +66,8 @@ jobs:
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 2 — Scan & Push
 # Builds the Docker image, scans it with Trivy, then pushes to DockerHub.
-# Pushing only happens on non-PR events (push to master/main or version tag).
+# Pushing only happens on non-PR events (push to main or version tag) and when
+# DockerHub credentials are configured as repo secrets.
 # ─────────────────────────────────────────────────────────────────────────────
   scan-and-push:
     name: Scan & Push
@@ -121,10 +121,26 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
-      # ── Push (skipped for pull requests) ────────────────────────────────────
+      # ── Push (skipped for pull requests and when DockerHub secrets are unset) ─
+      # DOCKERHUB_USERNAME presence gates the whole push sequence so forks and
+      # repos without secrets configured don't fail with a "/backstage-app"
+      # image name or an empty login.
+
+      - name: Check DockerHub credentials
+        id: dockerhub
+        if: github.event_name != 'pull_request'
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          if [ -z "${DOCKERHUB_USERNAME}" ]; then
+            echo "::warning::DOCKERHUB_USERNAME secret not set — skipping image push."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Login to DockerHub
-        if: github.event_name != 'pull_request'
+        if: steps.dockerhub.outputs.configured == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -136,9 +152,10 @@ jobs:
       #   v1.2.3 / 1.2     — on semver git tags
       - name: Extract Docker metadata
         id: meta
+        if: steps.dockerhub.outputs.configured == 'true'
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/backstage-app
           tags: |
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
@@ -149,7 +166,7 @@ jobs:
             org.opencontainers.image.description=Internal Developer Portal
 
       - name: Build and push to DockerHub
-        if: github.event_name != 'pull_request'
+        if: steps.dockerhub.outputs.configured == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
