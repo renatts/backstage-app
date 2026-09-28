@@ -78,7 +78,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Project-Specific Guidelines
 
-- This is a Backstage developer portal project (v1.50.1)
+- This is a Backstage developer portal project (v1.55.2)
 - Frontend: New Frontend System (default in v1.49+), uses `packages/app`
 - Backend: `packages/backend`
 - Plugins go in `plugins/` directory

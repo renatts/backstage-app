@@ -1,7 +1,7 @@
 # Backstage Developer Portal
 
 [![CI](https://github.com/renatts/backstage-app/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/renatts/backstage-app/actions/workflows/ci.yaml)
-![Backstage](https://img.shields.io/badge/Backstage-1.50.1-9BF0E1?logo=backstage&logoColor=black)
+![Backstage](https://img.shields.io/badge/Backstage-1.55.2-9BF0E1?logo=backstage&logoColor=black)
 ![Node](https://img.shields.io/badge/Node.js-24-339933?logo=nodedotjs&logoColor=white)
 
 An internal developer portal built on [Backstage](https://backstage.io). It gives engineers one place to find services, read their docs, see what runs in Kubernetes, and create new services from templates.
