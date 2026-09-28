@@ -105,7 +105,7 @@ jobs:
 
       # Scan the image — exit-code 1 blocks the push if HIGH/CRITICAL CVEs found.
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: backstage-app:${{ github.sha }}
           format: sarif
@@ -117,6 +117,22 @@ jobs:
           # Without this, sarif output includes every severity and exit-code
           # triggers on any finding — we only want HIGH/CRITICAL to fail CI.
           limit-severities-for-sarif: true
+
+      # Surface the findings that block the build in the job summary and as a
+      # check annotation, so a failed scan can be triaged without opening logs.
+      - name: Summarize Trivy findings
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        run: |
+          findings=$(jq -r '.runs[0].results[]? | "\(.ruleId) | " + (.message.text | gsub("\n"; " ; ") | .[0:240])' trivy-results.sarif | sort -u)
+          [ -z "$findings" ] && exit 0
+          {
+            echo "### Trivy findings (HIGH/CRITICAL, fixable)"
+            echo '```'
+            echo "$findings"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          body=$(printf '%s' "$findings" | head -c 15000 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')
+          echo "::error title=Trivy blocking findings::${body}"
 
       # Always upload results so they appear in the Security → Code Scanning tab.
       - name: Upload Trivy SARIF to GitHub Security
