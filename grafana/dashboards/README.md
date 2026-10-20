@@ -6,8 +6,24 @@ Dashboards for monitoring this Backstage instance. Import them in Grafana
 | File | Description |
 |------|-------------|
 | `backstage.json` | Backend OpenTelemetry metrics: catalog, scaffolder, scheduler, HTTP, MCP actions, Node runtime, pod resources |
+| `resource-review.json` | Kubernetes Resource Review: per-pod CPU/memory usage vs requests and limits, throttling, pressure, OOMs and restarts, for rightsizing |
 
-## Requirements
+## Requirements: `resource-review.json`
+
+Vendored unchanged from [learnk8s/resource-review-mixin](https://github.com/learnk8s/resource-review-mixin)
+(`generated/resource-review.json` at commit `982c301`), licensed under Apache-2.0 —
+see [`LICENSE.resource-review`](LICENSE.resource-review).
+
+The panels query `resource_review:*` recording rules, so the dashboard is empty
+until those rules are loaded in Prometheus. Install the upstream
+`generated/prometheus-rules.yaml` (a `PrometheusRule`) alongside it. It also
+needs kube-state-metrics and cAdvisor; see the upstream README for the
+`container_cpu_cfs_throttled_seconds_total` scrape setting in kube-prometheus-stack.
+
+To update, copy the newer `generated/resource-review.json` from upstream
+rather than editing this file.
+
+## Requirements: `backstage.json`
 
 The backend must run with OpenTelemetry metrics exported to Prometheus
 (see [Setup OpenTelemetry](https://backstage.io/docs/tutorials/setup-opentelemetry)).
